@@ -8,7 +8,7 @@ An HTTP API that reads campus operator notes with a language model, turns them i
 |---|---|
 | Health | `GET /health` → `{"status":"ok"}` |
 | Main endpoint | `POST /optimize-energy` |
-| Live base URL | `<FILL IN: deployed URL>` |
+| Live base URL | `https://gridwise-1v0j.onrender.com` |
 | Docker image | `ghcr.io/arafatislam123/gridwise:v1.0.0` (digest: `sha256:e30d0df8f4a064fbbe887f32b69e1435990943d1ba38f5921202154d123bae00`) |
 | Language model used for judging | Google Gemini, `gemini-3.5-flash-lite` (backup: Gemini `gemini-3.1-flash-lite`) |
 | Optimizer | Linear programming, HiGHS solver via `scipy.optimize.linprog` |
