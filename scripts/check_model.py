@@ -34,7 +34,8 @@ async def check(http: httpx.AsyncClient, provider) -> bool:
         print("  key rejected (401) - check LLM_API_KEY / LLM_BACKUP_API_KEY")
         return False
     if r.status_code == 200:
-        ids = sorted(m.get("id", "") for m in r.json().get("data", []))
+        # Gemini lists ids as "models/<id>"; compare on the bare id.
+        ids = sorted(m.get("id", "").removeprefix("models/") for m in r.json().get("data", []))
         if provider.model not in ids:
             print(f"  model '{provider.model}' not offered. Available: {', '.join(ids[:25])}")
             return False

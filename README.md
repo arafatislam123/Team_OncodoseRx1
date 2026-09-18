@@ -10,7 +10,7 @@ An HTTP API that reads campus operator notes with a language model, turns them i
 | Main endpoint | `POST /optimize-energy` |
 | Live base URL | `<FILL IN: deployed URL>` |
 | Docker image | `ghcr.io/arafatislam123/gridwise:v1.0.0` (digest: `sha256:e30d0df8f4a064fbbe887f32b69e1435990943d1ba38f5921202154d123bae00`) |
-| Language model used for judging | Groq, `llama-3.3-70b-versatile` (backup: Groq `llama-3.1-8b-instant`) |
+| Language model used for judging | Google Gemini, `gemini-3.5-flash-lite` (backup: Gemini `gemini-3.1-flash-lite`) |
 | Optimizer | Linear programming, HiGHS solver via `scipy.optimize.linprog` |
 | Port | `8000` (override with `PORT`) |
 
@@ -278,6 +278,6 @@ docs/ARCHITECTURE.md    requirement analysis and design
 | httpx | model API client |
 | NumPy, SciPy (HiGHS solver) | linear programming |
 | pytest | tests |
-| Groq API (`llama-3.3-70b-versatile`, `llama-3.1-8b-instant`) | language model for note interpretation |
+| Google Gemini API (`gemini-3.5-flash-lite`, `gemini-3.1-flash-lite`) | language model for note interpretation |
 
 <!-- FILL IN: any other tools used, per the rulebook's credit requirement -->
