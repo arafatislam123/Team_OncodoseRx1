@@ -15,17 +15,17 @@ DECIMALS = 4
 ZERO = 1e-6
 
 
-def _r(x: float) -> float:
-    v = round(x, DECIMALS)
+def _r(x: float, decimals: int = DECIMALS) -> float:
+    v = round(x, decimals)
     return 0.0 if v == 0 else v  # avoid -0.0
 
 
-def build_plan(lim: HourlyLimits, sol: Solution) -> List[Dict[str, Any]]:
+def build_plan(lim: HourlyLimits, sol: Solution, decimals: int = DECIMALS) -> List[Dict[str, Any]]:
     rows: List[Dict[str, Any]] = []
     energy = lim.initial_energy
     for h in range(H):
         net = sol.charge[h] - sol.discharge[h]
-        amount = _r(abs(net)) if abs(net) > ZERO else 0.0
+        amount = _r(abs(net), decimals) if abs(net) > ZERO else 0.0
         if amount == 0.0:
             action = "idle"
         else:
@@ -33,16 +33,15 @@ def build_plan(lim: HourlyLimits, sol: Solution) -> List[Dict[str, Any]]:
 
         charge = amount if action == "charge" else 0.0
         discharge = amount if action == "discharge" else 0.0
-        solar = _r(min(max(sol.solar[h], 0.0), lim.eff_solar[h]))
+        solar = _r(min(max(sol.solar[h], 0.0), lim.eff_solar[h]), decimals)
         grid = lim.demand[h] + charge - solar - discharge
         if grid < 0:
             # Tiny negative from rounding: use a bit less solar instead.
-            solar = _r(max(0.0, solar + grid))
+            solar = _r(max(0.0, solar + grid), decimals)
             grid = lim.demand[h] + charge - solar - discharge
-        grid = _r(max(grid, 0.0))
+        grid = _r(max(grid, 0.0), decimals)
 
-        energy = energy + charge - discharge
-        energy_out = _r(energy)
+        energy_out = _r(energy + charge - discharge, decimals)
         energy = energy_out
         rows.append({
             "hour": h,

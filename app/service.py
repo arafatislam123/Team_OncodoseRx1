@@ -24,8 +24,13 @@ def _schedule(req: OptimizeRequest, directives):
     tot = totals(rows, lim.tariff)
     problems = replay(lim, rows, tot)
     if problems and not sol.relaxed:
-        # Should never happen; the LP respects every limit. Logged for investigation.
-        log.error("replay found %d problem(s): %s", len(problems), problems[:3])
+        # Should never happen (the LP respects every limit); try again with finer rounding.
+        log.error("replay found %d problem(s), rebuilding at higher precision: %s", len(problems), problems[:3])
+        rows = build_plan(lim, sol, decimals=6)
+        tot = totals(rows, lim.tariff)
+        still = replay(lim, rows, tot)
+        if still:
+            log.error("replay still reports %d problem(s): %s", len(still), still[:3])
     return rows, tot, sol
 
 

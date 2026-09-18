@@ -15,7 +15,12 @@ log = logging.getLogger("gridwise.llm")
 
 
 class LLMError(RuntimeError):
-    pass
+    def __init__(self, message: str, retryable: bool = False):
+        super().__init__(message)
+        self.retryable = retryable
+
+
+RETRY_MIN_S = 2.0
 
 
 class LLMClient:
@@ -24,6 +29,19 @@ class LLMClient:
         self._json_mode_unsupported: set = set()
 
     async def chat(self, provider: ProviderConfig, messages: List[dict], timeout: float) -> str:
+        """One call with a single retry for fast transient failures (429, 5xx, connection
+        errors), as long as enough of the time budget is left."""
+        end = time.monotonic() + timeout
+        try:
+            return await self._call(provider, messages, timeout)
+        except LLMError as exc:
+            left = end - time.monotonic()
+            if not exc.retryable or left < RETRY_MIN_S:
+                raise
+            log.info("%s: retrying once after transient error", provider.name)
+            return await self._call(provider, messages, left)
+
+    async def _call(self, provider: ProviderConfig, messages: List[dict], timeout: float) -> str:
         if not provider.enabled:
             raise LLMError(f"{provider.name} provider not configured")
         if timeout <= 0.5:
@@ -47,18 +65,19 @@ class LLMClient:
         try:
             resp = await self.http.post(url, json=body, headers=headers, timeout=timeout)
         except httpx.TimeoutException:
-            raise LLMError(f"{provider.name} timed out")
+            raise LLMError(f"{provider.name} timed out")  # budget used up, not retried
         except httpx.HTTPError as exc:
-            raise LLMError(f"{provider.name} connection error: {type(exc).__name__}")
+            raise LLMError(f"{provider.name} connection error: {type(exc).__name__}", retryable=True)
 
         if resp.status_code == 400 and use_json_mode:
             # Some providers/models reject response_format; remember and retry once without it.
             self._json_mode_unsupported.add(provider.name)
             log.info("%s rejected JSON mode, retrying without it", provider.name)
-            return await self.chat(provider, messages, timeout - 0.5)
+            return await self._call(provider, messages, timeout - 0.5)
         if resp.status_code >= 400:
             # Status only; provider error bodies can echo request details.
-            raise LLMError(f"{provider.name} returned HTTP {resp.status_code}")
+            retryable = resp.status_code == 429 or resp.status_code >= 500
+            raise LLMError(f"{provider.name} returned HTTP {resp.status_code}", retryable=retryable)
 
         try:
             content: Optional[str] = resp.json()["choices"][0]["message"]["content"]

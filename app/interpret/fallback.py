@@ -20,7 +20,12 @@ _OTHER_DAY = re.compile(r"\b(tomorrow|yesterday|next\s+(week|month|year|semester
                         r"|previous\s+(week|month))\b", re.I)
 _NEGATIVE = re.compile(r"\b(not|no|disabled?|unavailable|prohibited|forbidden|locked|cannot|can't|blocked|suspend\w*"
                        r"|paus\w*|isolat\w*|offline|avoid|halt\w*|stop\w*|out of service|down)\b", re.I)
-_RESERVE = re.compile(r"\b(reserve|at least|minimum|keep|remain|hold|backup|stay above|not (go|drop|fall) below)\b", re.I)
+_RESERVE = re.compile(r"\b(reserve|at least|minimum|keep|remain|hold|backup|stay above|no less than"
+                      r"|(go|drop|fall|dip) below)\b", re.I)
+_DISCHARGE_WORDS = re.compile(r"discharg|battery (output|supply)|supply (the )?(campus )?load", re.I)
+# A time is mentioned in a form we can't parse (spelled-out numbers, day parts...): don't guess a window.
+_UNPARSED_TIME = re.compile(r"\b(from|until|till|between|after|before|through)\b|o'clock|morning|afternoon|evening"
+                            r"|night|\b(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\b", re.I)
 _GRID = re.compile(r"\b(grid|import|feeder|transformer|substation|intake|utility|purchase)\b", re.I)
 _SOLAR = re.compile(r"\b(solar|pv|photovoltaic|panels?|rooftop)\b", re.I)
 _PCT = re.compile(r"(\d+(?:\.\d+)?)\s*(?:%|percent)", re.I)
