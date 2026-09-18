@@ -1,0 +1,70 @@
+name: ci
+
+# Runs the test suite, builds the Docker image, smoke-tests the container
+# (/health + one public sample), then pushes it to GitHub Container Registry.
+# Push to main  -> ghcr.io/<owner>/gridwise:sha-<commit>
+# Tag v1.0.0    -> also ghcr.io/<owner>/gridwise:v1.0.0
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements-dev.txt
+      - run: python -m pytest -q
+
+  image:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image
+        run: docker build -t gridwise:ci .
+
+      - name: Smoke test container
+        run: |
+          docker run -d --name gw -p 8000:8000 gridwise:ci
+          for i in $(seq 1 30); do curl -fs http://localhost:8000/health && break; sleep 1; done
+          echo
+          test "$(curl -fs http://localhost:8000/health)" = '{"status":"ok"}'
+          code=$(curl -s -o /tmp/out.json -w "%{http_code}" -X POST http://localhost:8000/optimize-energy \
+                 -H "Content-Type: application/json" -d @samples/request_sample01.json)
+          test "$code" = "200"
+          python3 -c "import json; b=json.load(open('/tmp/out.json')); assert abs(b['total_cost_bdt']-38365) < 0.01, b['total_cost_bdt']; print('sample ok', b['total_cost_bdt'])"
+          docker rm -f gw
+
+      - name: Log in to GHCR
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push image
+        if: github.event_name != 'pull_request'
+        run: |
+          IMAGE="ghcr.io/$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')/gridwise"
+          SHORT="sha-${GITHUB_SHA::7}"
+          docker tag gridwise:ci "$IMAGE:$SHORT"
+          docker push "$IMAGE:$SHORT"
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            docker tag gridwise:ci "$IMAGE:$GITHUB_REF_NAME"
+            docker push "$IMAGE:$GITHUB_REF_NAME"
+          fi
+          echo "Pushed: $(docker inspect --format='{{index .RepoDigests 0}}' "$IMAGE:$SHORT")" | tee -a "$GITHUB_STEP_SUMMARY"

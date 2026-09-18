@@ -114,7 +114,7 @@ def extract(text: str) -> dict:
         return noop
 
     dtype, value = None, None
-    if "discharg" in low and _NEGATIVE.search(t):
+    if _DISCHARGE_WORDS.search(t) and _NEGATIVE.search(t):
         dtype = NO_DISCHARGE
     elif re.search(r"\bcharg", low) and _NEGATIVE.search(t) and not _RESERVE.search(t):
         dtype = NO_CHARGE
@@ -137,5 +137,8 @@ def extract(text: str) -> dict:
 
     if dtype is None:
         return noop
-    return {"relevant": True, "directive_type": dtype, "windows": _windows(t), "value": value,
+    windows = _windows(t)
+    if not windows and _UNPARSED_TIME.search(t):
+        return noop
+    return {"relevant": True, "directive_type": dtype, "windows": windows, "value": value,
             "explanation": f"Recognised as {dtype} (fallback interpreter)."}

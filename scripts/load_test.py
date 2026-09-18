@@ -27,11 +27,13 @@ def main() -> int:
 
     inputs = [c["input"] for c in json.loads(Path(args.file).read_text(encoding="utf-8"))["cases"]]
     url = args.url.rstrip("/") + "/optimize-energy"
+    # One shared client (thread-safe): building a client per request is slow and would skew latency.
+    http = httpx.Client(timeout=35, limits=httpx.Limits(max_connections=args.concurrency))
 
     def one(i: int):
         t0 = time.perf_counter()
         try:
-            r = httpx.post(url, json=inputs[i % len(inputs)], timeout=35)
+            r = http.post(url, json=inputs[i % len(inputs)])
             code = r.status_code
             if code == 200:
                 r.json()
@@ -43,6 +45,7 @@ def main() -> int:
     with ThreadPoolExecutor(max_workers=args.concurrency) as pool:
         results = list(pool.map(one, range(args.requests)))
     wall = time.perf_counter() - t_start
+    http.close()
 
     codes = Counter(c for c, _ in results)
     lat = sorted(t for _, t in results)

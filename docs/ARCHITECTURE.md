@@ -63,7 +63,7 @@ Two rules from the rubric shape the whole pipeline:
 
 We went through all 10 cases and noted what they teach us:
 
-- **The reference plans are LP optima.** We built the LP described in section 3.6 and ran it on samples 01, 02, 03, 05 and 09. Costs came out at exactly 38365, 42885, 35480, 33950 and 34873, the same as the reference answers. So a linear program is the right tool and gives full optimization credit.
+- **The reference plans are LP optima.** We built the LP described in section 3.6 and ran it on all 10 samples with the expected directives. Every cost matches the reference exactly (e.g. 38365, 42885, 35480, 33950, 34873 for samples 01, 02, 03, 05, 09). So a linear program is the right tool and gives full optimization credit.
 - **Arbitrage is expected.** In SAMPLE-01 the battery discharges at hour 1 (6 BDT) and recharges at hours 2-4 (5 BDT). The optimizer has to be free to do this; no greedy "charge at night, discharge at peak" rules.
 - **The reserve applies to the energy after the hour.** SAMPLE-03: reserve 100 kWh on hours 18-20, battery is exactly 100 after hour 20 and drops to 50 after hour 21. This matches `battery_energy_after_kwh[h] >= reserve`.
 - **Percent reserve is converted using capacity.** SAMPLE-03: "50 % of battery capacity" with capacity 200 becomes `minimum_energy_kwh: 100`.
@@ -317,7 +317,7 @@ subject to  g[h] + s[h] + d[h] = demand[h] + c[h]          energy balance
 
 - `eps = 1e-6` is a tie-breaker that discourages pointless charge-and-discharge cycles. Its effect on cost is far below the 0.01 BDT tolerance.
 - Solved with HiGHS through `scipy.optimize.linprog`. Deterministic, exact, fast.
-- Checked against public samples 01, 02, 03, 05, 09: costs match the reference optimum exactly.
+- Checked against all 10 public samples: costs match the reference optimum exactly.
 
 **If the LP is infeasible** (only possible when directives conflict, since the base problem is always feasible after request validation): the organizers say real scoring scenarios are feasible, so this almost certainly means a misread note. We re-solve with the directive constraints turned into soft constraints (non-negative slack variables with a large penalty), while physics (balance, bounds, rates, neutrality) stays hard. The response is still a physically valid plan, and `plan_summary` says which directive could not be fully met. This keeps the service at 200 instead of failing the request.
 
@@ -421,6 +421,7 @@ gridwise/
 |   |   |-- directives.py    # intent + directive models
 |   |   `-- response.py      # response models
 |   |-- interpret/
+|   |   |-- interpreter.py   # runs the chain: cache -> models -> repair -> fallback
 |   |   |-- prompt.py        # system prompt + few-shot examples
 |   |   |-- llm_client.py    # provider adapter, primary/backup, timeouts
 |   |   |-- intent_parser.py # model JSON -> intent objects
@@ -440,15 +441,19 @@ gridwise/
 |   |-- test_solver.py       # all 10 samples with ground-truth directives
 |   |-- test_replay.py
 |   |-- test_api.py          # status codes, malformed input, mocked LLM failures
+|   |-- test_llm_client.py   # retry, JSON-mode fallback, no leaking of provider errors
+|   |-- test_fallback.py     # degraded extractor on samples and PS examples
 |   `-- data/paraphrases.json
 |-- scripts/
-|   `-- run_samples.py       # hits a running server with the public samples
-|-- samples/public_cases.json
+|   |-- run_samples.py       # hits a running server with the public samples
+|   |-- run_paraphrases.py   # model accuracy on reworded notes
+|   |-- load_test.py         # concurrency / p95 check
+|   `-- check_solver.py      # optimizer only, expected directives
+|-- samples/public_cases.json, samples/request_sample01.json
 |-- docs/ARCHITECTURE.md
-|-- Dockerfile
-|-- .dockerignore
+|-- Dockerfile, .dockerignore, render.yaml, Procfile
 |-- .env.example
-|-- requirements.txt
+|-- requirements.txt, requirements-dev.txt
 `-- README.md
 ```
 

@@ -1,5 +1,8 @@
 FROM python:3.11-slim
 
+LABEL org.opencontainers.image.source="https://github.com/arafatislam123/Team_OncodoseRx1" \
+      org.opencontainers.image.description="GridWise energy optimizer API (GET /health, POST /optimize-energy)"
+
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \

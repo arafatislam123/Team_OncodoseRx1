@@ -9,8 +9,8 @@ An HTTP API that reads campus operator notes with a language model, turns them i
 | Health | `GET /health` → `{"status":"ok"}` |
 | Main endpoint | `POST /optimize-energy` |
 | Live base URL | `<FILL IN: deployed URL>` |
-| Docker image | `<FILL IN: e.g. docker.io/<user>/gridwise:v1.0.0>` (digest: `<FILL IN>`) |
-| Language model used for judging | `<FILL IN: provider + model id>` |
+| Docker image | `ghcr.io/arafatislam123/gridwise:v1.0.0` (digest: `<FILL IN after first tagged build>`) |
+| Language model used for judging | Groq, `llama-3.3-70b-versatile` (backup: Groq `llama-3.1-8b-instant`) |
 | Optimizer | Linear programming, HiGHS solver via `scipy.optimize.linprog` |
 | Port | `8000` (override with `PORT`) |
 
@@ -21,7 +21,7 @@ An HTTP API that reads campus operator notes with a language model, turns them i
 Requirements: Python 3.11+ and git.
 
 ```bash
-git clone <FILL IN: repository URL> gridwise
+git clone https://github.com/arafatislam123/Team_OncodoseRx1.git gridwise
 cd gridwise
 
 python -m venv .venv
@@ -61,30 +61,56 @@ Unit and API tests (no model key needed, the model is mocked):
 python -m pytest -q
 ```
 
+More checks:
+
+```bash
+# interpretation accuracy of the configured model on 32 reworded notes (no server needed)
+python scripts/run_paraphrases.py
+
+# load test: status codes and p50/p95 latency under concurrency
+python scripts/load_test.py --url http://localhost:8000 --requests 30 --concurrency 5
+
+# optimizer only: feed each sample its expected directives, compare with the reference cost
+python scripts/check_solver.py
+```
+
 ---
 
 ## 2. Docker fallback
 
 ```bash
-docker pull <FILL IN: image:tag>
+docker pull ghcr.io/arafatislam123/gridwise:v1.0.0
 docker run --rm -p 8000:8000 \
   -e LLM_BASE_URL=<provider base url> \
   -e LLM_API_KEY=<your key> \
   -e LLM_MODEL=<model id> \
-  <FILL IN: image:tag>
+  ghcr.io/arafatislam123/gridwise:v1.0.0
 
 curl http://localhost:8000/health
 ```
 
-Or with an env file: `docker run --rm -p 8000:8000 --env-file .env <image:tag>`.
+Or with an env file: `docker run --rm -p 8000:8000 --env-file .env ghcr.io/arafatislam123/gridwise:v1.0.0`.
 
 The image listens on `0.0.0.0:8000`, has a built-in `HEALTHCHECK`, runs as a non-root user, and contains **no credentials**; keys are only passed at run time.
 
-Build it yourself:
+The published image is built by GitHub Actions ([.github/workflows/ci.yml](.github/workflows/ci.yml)): every push runs the tests, builds the image, starts it, checks `/health` and one public sample inside the container, and only then pushes it to GHCR. A `v*` git tag publishes the image under that tag.
+
+Build it locally instead:
 
 ```bash
-docker build -t gridwise:v1.0.0 .
+docker build -t gridwise:local .
+docker run --rm -p 8000:8000 --env-file .env gridwise:local
 ```
+
+### Hosting
+
+Any always-on container host works (the service only needs the env vars from section 3).
+
+- **Render:** `render.yaml` is included. New → Blueprint → select the repo, enter the `LLM_*` values when asked. Health check path is `/health`.
+- **Railway / Fly.io / a VM:** deploy the Dockerfile, set the `LLM_*` variables; the container reads `PORT` if the platform sets one.
+- **Buildpack platforms:** `Procfile` is included.
+
+Avoid free tiers that sleep when idle; a cold start during judging hurts both the readiness and the latency checks.
 
 ---
 
@@ -209,9 +235,11 @@ app/
   optimize/             constraint builder, LP solver, plan builder
   validate/replay.py    independent plan checker
 samples/                public sample cases + a single request file for curl
-scripts/run_samples.py  judge-style runner against a live URL
-scripts/check_solver.py solver check with the expected directives (no model needed)
-tests/                  unit + API tests (model mocked)
+scripts/run_samples.py      judge-style runner against a live URL
+scripts/run_paraphrases.py  interpretation accuracy on reworded notes
+scripts/load_test.py        concurrency / latency check
+scripts/check_solver.py     solver check with the expected directives (no model needed)
+tests/                  unit + API tests (model mocked), tests/data/paraphrases.json
 docs/ARCHITECTURE.md    requirement analysis and design
 ```
 
@@ -229,7 +257,7 @@ docs/ARCHITECTURE.md    requirement analysis and design
 ## 8. Known limitations
 
 - Interpretation quality depends on the configured model; test a new model with `scripts/run_samples.py` before switching.
-- The degraded fallback only understands explicit phrasings (clock times, %, kWh). Paraphrases like "from one until three" need the model.
+- The degraded fallback only understands explicit phrasings (clock times, %, kWh). Spelled-out times like "from one until three" need the model; when the fallback can't read a time it returns `no_op` rather than guessing a window.
 - A solar reduction given as an absolute kWh amount (rather than a fraction) cannot be expressed as a single `factor` and is not supported.
 - The interpretation cache is in-memory per worker process and is cleared on restart.
 - If two directives of the same type cover the same hour, the strictest reading is used (highest reserve, lowest cap, solar factors multiplied).
@@ -246,6 +274,6 @@ docs/ARCHITECTURE.md    requirement analysis and design
 | httpx | model API client |
 | NumPy, SciPy (HiGHS solver) | linear programming |
 | pytest | tests |
-| `<FILL IN: model provider>` | language model for note interpretation |
+| Groq API (`llama-3.3-70b-versatile`, `llama-3.1-8b-instant`) | language model for note interpretation |
 
 <!-- FILL IN: any other tools used, per the rulebook's credit requirement -->

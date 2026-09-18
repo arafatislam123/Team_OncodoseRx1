@@ -11,6 +11,7 @@ import json
 import logging
 import uuid
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 import httpx
 from fastapi import FastAPI, Request
@@ -82,10 +83,28 @@ async def health():
 
 @app.get("/")
 async def root():
-    return {"service": "gridwise", "endpoints": ["GET /health", "POST /optimize-energy"]}
+    return {"service": "gridwise", "endpoints": ["GET /health", "POST /optimize-energy"], "docs": "/docs"}
 
 
-@app.post("/optimize-energy")
+def _example_request() -> dict:
+    """Sample body shown in the /docs page so the endpoint can be tried from a browser."""
+    path = Path(__file__).resolve().parent.parent / "samples" / "request_sample01.json"
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+
+
+# The body is parsed by hand (to control 400 vs 422), so describe it for the docs page explicitly.
+_OPENAPI_BODY = {
+    "requestBody": {
+        "required": True,
+        "content": {"application/json": {"schema": {"type": "object"}, "example": _example_request()}},
+    }
+}
+
+
+@app.post("/optimize-energy", openapi_extra=_OPENAPI_BODY)
 async def optimize_energy(request: Request):
     raw = await request.body()
     try:
