@@ -9,7 +9,7 @@ An HTTP API that reads campus operator notes with a language model, turns them i
 | Health | `GET /health` → `{"status":"ok"}` |
 | Main endpoint | `POST /optimize-energy` |
 | Live base URL | `<FILL IN: deployed URL>` |
-| Docker image | `ghcr.io/arafatislam123/gridwise:v1.0.0` (digest: `<FILL IN after first tagged build>`) |
+| Docker image | `ghcr.io/arafatislam123/gridwise:v1.0.0` (digest: `sha256:e30d0df8f4a064fbbe887f32b69e1435990943d1ba38f5921202154d123bae00`) |
 | Language model used for judging | Groq, `llama-3.3-70b-versatile` (backup: Groq `llama-3.1-8b-instant`) |
 | Optimizer | Linear programming, HiGHS solver via `scipy.optimize.linprog` |
 | Port | `8000` (override with `PORT`) |
@@ -64,6 +64,9 @@ python -m pytest -q
 More checks:
 
 ```bash
+# model key and model id valid, one real interpretation call with latency
+python scripts/check_model.py
+
 # interpretation accuracy of the configured model on 32 reworded notes (no server needed)
 python scripts/run_paraphrases.py
 
@@ -239,6 +242,7 @@ scripts/run_samples.py      judge-style runner against a live URL
 scripts/run_paraphrases.py  interpretation accuracy on reworded notes
 scripts/load_test.py        concurrency / latency check
 scripts/check_solver.py     solver check with the expected directives (no model needed)
+scripts/check_model.py      verifies the model key, model id and latency
 tests/                  unit + API tests (model mocked), tests/data/paraphrases.json
 docs/ARCHITECTURE.md    requirement analysis and design
 ```
