@@ -4,6 +4,7 @@ Works with hosted providers that expose this API and with local servers
 (Ollama, vLLM, LM Studio). Provider, key and model come from env vars.
 """
 import logging
+import time
 from typing import List, Optional
 
 import httpx
